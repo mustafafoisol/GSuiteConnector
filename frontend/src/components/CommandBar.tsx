@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api/client";
 import type { CommandResult, PendingAction } from "../api/types";
@@ -11,6 +11,13 @@ export function CommandBar() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CommandResult | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
+
+  const { data: aiStatus } = useQuery({
+    queryKey: ["assistant-status"],
+    queryFn: () => api.assistantStatus(),
+    staleTime: Infinity,
+  });
+  const aiAvailable = aiStatus?.available ?? true;
 
   const refreshViews = () => {
     qc.invalidateQueries({ queryKey: ["messages"] });
@@ -29,14 +36,14 @@ export function CommandBar() {
       setPending(res.pending);
       if (res.actions_taken.length) refreshViews();
       setText("");
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     } finally {
       setBusy(false);
     }
   }
 
-  async function confirm() {
+  async function confirmAction() {
     if (!pending) return;
     setBusy(true);
     try {
@@ -45,11 +52,22 @@ export function CommandBar() {
       setPending(null);
       setResult(null);
       refreshViews();
-    } catch (e) {
-      toast(errorMessage(e), "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     } finally {
       setBusy(false);
     }
+  }
+
+  if (!aiAvailable) {
+    return (
+      <div className="commandbar">
+        <p className="muted" style={{ margin: 0, fontSize: 12 }}>
+          AI command bar disabled &mdash; add <code>ANTHROPIC_API_KEY</code> to{" "}
+          <code>backend/.env</code> to enable it.
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -59,7 +77,7 @@ export function CommandBar() {
         <div className="assistant-reply pending">
           <strong>Confirm:</strong> {pending.summary}
           <div className="pending-row">
-            <button className="primary" onClick={confirm} disabled={busy}>
+            <button className="primary" onClick={confirmAction} disabled={busy}>
               Confirm
             </button>
             <button onClick={() => setPending(null)} disabled={busy}>
@@ -70,13 +88,13 @@ export function CommandBar() {
       )}
       <form onSubmit={submit}>
         <input
-          placeholder="Ask anything… e.g. “summarize my unread emails” or “schedule a 30-min sync tomorrow 3pm”"
+          placeholder="Ask anything... e.g. 'summarize my unread emails' or 'schedule a 30-min sync tomorrow 3pm'"
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={busy}
         />
         <button className="primary" type="submit" disabled={busy || !text.trim()}>
-          {busy ? "…" : "Send"}
+          {busy ? "Sending..." : "Send"}
         </button>
       </form>
     </div>

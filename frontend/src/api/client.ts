@@ -54,6 +54,8 @@ export const api = {
     http.delete(`/calendar/events/${id}`).then((r) => r.data),
 
   // assistant
+  assistantStatus: () =>
+    http.get<{ available: boolean }>("/assistant/status").then((r) => r.data),
   command: (text: string) =>
     http.post<CommandResult>("/assistant/command", { text }).then((r) => r.data),
   confirm: (action: PendingAction) =>
